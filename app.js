@@ -90,7 +90,6 @@ async function renderHome(){
       ...(recent.length?[['Continue Listening',recent]]:[]),
       ...(recentlyPlayed.length?[['Recently Played',recentlyPlayed]]:[]),
       ['Mysteries',bestEditions(rowResults[0])],['Adventure',bestEditions(rowResults[1])],['Science Fiction',bestEditions(rowResults[2])],['Dark & Supernatural',bestEditions(rowResults[3])],['Romance',bestEditions(rowResults[4])],
- 
       ...(fav.length?[['My List',fav]]:[])
     ].filter(([,b])=>b.length);
     view.innerHTML=`${hero?heroMarkup(hero):''}<div class="content-rows">${rowDefs.map(([name,books])=>rowMarkup(name,books)).join('')}</div>`;
