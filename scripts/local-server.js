@@ -4,9 +4,9 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { URL } = require('url');
-const { getLibriVox, searchOpenLibrary, getWikipediaAuthor } = require('./lib/providers');
+const { getLibriVox, searchOpenLibrary, getWikipediaAuthor } = require('../lib/providers');
 
-const ROOT = __dirname;
+const ROOT = path.resolve(__dirname, '..');
 const PORT = Number(process.env.PORT || 3000);
 const TYPES = { '.html':'text/html; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.css':'text/css; charset=utf-8', '.svg':'image/svg+xml', '.png':'image/png', '.jpg':'image/jpeg', '.jpeg':'image/jpeg', '.ico':'image/x-icon', '.json':'application/json; charset=utf-8' };
 

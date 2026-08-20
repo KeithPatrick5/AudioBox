@@ -4,8 +4,8 @@
   "private": true,
   "description": "Netflix-style audiobook streaming interface powered by LibriVox",
   "scripts": {
-    "start": "node server.js",
-    "check": "node --check server.js && node --check app.js && node --check lib/providers.js && node --check api/librivox.js && node --check api/openlibrary.js && node --check api/wikipedia.js"
+    "dev": "node scripts/local-server.js",
+    "check": "node --check scripts/local-server.js && node --check app.js && node --check lib/providers.js && node --check api/librivox.js && node --check api/openlibrary.js && node --check api/wikipedia.js"
   },
   "engines": {
     "node": ">=18"
