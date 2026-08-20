@@ -1,0 +1,93 @@
+'use strict';
+
+const $ = (sel, root=document) => root.querySelector(sel);
+const $$ = (sel, root=document) => [...root.querySelectorAll(sel)];
+
+const GENRES = [
+  ['Adventure','Adventure'],
+  ['Mystery','Mystery'],
+  ['Science Fiction','Science Fiction'],
+  ['Horror','Horror'],
+  ['Romance','Romance'],
+  ['Poetry','Poetry'],
+  ['History','History'],
+  ['Biography','Biography'],
+  ['Children','Children'],
+  ['Humor','Humor']
+];
+
+const state = {
+  bookCache: new Map(), coverCache: new Map(), wikiCache: new Map(),
+  rows: new Map(), currentBook: null, currentChapter: 0,
+  view: 'home', searchTimer: null, sleepTimer: null
+};
+
+const store = {
+  get(key, fallback){ try{return JSON.parse(localStorage.getItem(`audiobox:${key}`)) ?? fallback}catch{return fallback} },
+  set(key, value){ localStorage.setItem(`audiobox:${key}`, JSON.stringify(value)) },
+  favorites(){ return this.get('favorites', []) },
+  toggleFavorite(id){ const items=this.favorites(); const i=items.indexOf(String(id)); if(i>=0)items.splice(i,1);else items.unshift(String(id));this.set('favorites',items);return i<0 },
+  progress(){ return this.get('progress', {}) },
+  saveProgress(id, data){ const p=this.progress();p[String(id)]={...p[String(id)],...data,updatedAt:Date.now()};this.set('progress',p) },
+  recent(){ return this.get('recent', []) },
+  touchRecent(id){ const ids=this.recent().filter(x=>String(x)!==String(id));ids.unshift(String(id));this.set('recent',ids.slice(0,30)) }
+};
+
+function escapeHtml(s=''){ return String(s).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])) }
+function stripHtml(s=''){ const d=document.createElement('div');d.innerHTML=s;return (d.textContent||'').replace(/\s+/g,' ').trim() }
+function authorName(book){ const a=book?.authors?.[0];return a ? [a.first_name,a.last_name].filter(Boolean).join(' ') : 'Unknown author' }
+function allAuthors(book){ return (book?.authors||[]).map(a=>[a.first_name,a.last_name].filter(Boolean).join(' ')).filter(Boolean).join(', ')||'Unknown author' }
+function genreNames(book){ return (book?.genres||[]).map(g=>g.name).filter(Boolean) }
+function parsePlaytime(s){ if(typeof s==='number')return s; const parts=String(s||'0').split(':').map(Number); if(parts.some(Number.isNaN))return Number(s)||0; return parts.reduce((acc,n)=>acc*60+n,0) }
+function fmtTime(sec){ if(!Number.isFinite(sec)||sec<0)return '0:00';sec=Math.floor(sec);const h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60),s=sec%60;return h?`${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`:`${m}:${String(s).padStart(2,'0')}` }
+function compactRuntime(book){ const sec=book.totaltimesecs||0;if(!sec)return book.totaltime||'';const h=Math.floor(sec/3600),m=Math.round((sec%3600)/60);return h?`${h}h ${m}m`:`${m}m` }
+function normalizedTitle(title=''){return title.toLowerCase().replace(/[\[(]?version\s*\d+[\])]?/gi,'').replace(/\s+/g,' ').trim()}
+function editionScore(book){ const readers=new Set((book.sections||[]).flatMap(s=>(s.readers||[]).map(r=>r.reader_id||r.display_name)).filter(Boolean)); let score=0;if(readers.size===1)score+=100;if(readers.size>1)score+=Math.max(0,40-readers.size);score+=Math.min(30,(book.sections||[]).length/2);score+=Math.min(20,(Number(book.id)||0)/5000);return score }
+function bestEditions(books){ const groups=new Map();for(const book of books){const key=`${normalizedTitle(book.title)}|${authorName(book).toLowerCase()}`;const old=groups.get(key);if(!old||editionScore(book)>editionScore(old))groups.set(key,book)}return [...groups.values()] }
+function rememberBooks(books){ books.forEach(b=>state.bookCache.set(String(b.id),b));return books }
+
+async function api(path, params={}){
+  const qs=new URLSearchParams(Object.entries(params).filter(([,v])=>v!==undefined&&v!==null&&v!==''));
+  const r=await fetch(`${path}?${qs}`);if(!r.ok)throw new Error((await r.json().catch(()=>({}))).error||`Request failed (${r.status})`);return r.json()
+}
+async function fetchBooks(params={}){ const {books}=await api('/api/librivox',params);return rememberBooks(books||[]) }
+
+function fallbackMarkup(book){return `<div class="cover-fallback"><strong>${escapeHtml(book.title)}</strong><span>${escapeHtml(authorName(book))}</span></div>`}
+function getPrimaryCover(book){return book.coverart_jpg||book.coverart_thumbnail||''}
+async function resolveCover(book){
+  const primary=getPrimaryCover(book);if(primary)return primary;
+  const key=`${book.title}|${authorName(book)}`;if(state.coverCache.has(key))return state.coverCache.get(key);
+  try{const {results}=await api('/api/openlibrary',{q:`${book.title} ${authorName(book)}`,limit:1});const cover=results?.[0]?.cover||'';state.coverCache.set(key,cover);return cover}catch{state.coverCache.set(key,'');return ''}
+}
+function loadCover(img,book){
+  const primary=getPrimaryCover(book); if(primary){img.src=primary;img.hidden=false;img.addEventListener('error',async()=>{img.onerror=null;const fallback=await resolveCover({...book,coverart_jpg:'',coverart_thumbnail:''});if(fallback)img.src=fallback;else img.hidden=true},{once:true});return}
+  resolveCover(book).then(url=>{if(url){img.src=url;img.hidden=false}else img.hidden=true})
+}
+
+function progressFor(book){const p=store.progress()[String(book.id)];if(!p)return 0;const total=book.totaltimesecs||0;if(!total)return 0;const completedBefore=(book.sections||[]).slice(0,p.chapterIndex||0).reduce((n,s)=>n+parsePlaytime(s.playtime),0);return Math.min(100,((completedBefore+(p.time||0))/total)*100)}
+function cardMarkup(book){ const prog=progressFor(book);return `<button class="card" data-book-id="${escapeHtml(book.id)}" aria-label="${escapeHtml(book.title)}">${fallbackMarkup(book)}<img data-cover-id="${escapeHtml(book.id)}" alt="Cover of ${escapeHtml(book.title)}" hidden /><div class="card-overlay"><strong>${escapeHtml(book.title)}</strong><span>${escapeHtml(authorName(book))}</span></div>${prog>0?`<div class="progress-line"><i style="width:${prog.toFixed(1)}%"></i></div>`:''}</button>` }
+function hydrateCovers(root=document){ $$('img[data-cover-id]',root).forEach(img=>{const b=state.bookCache.get(img.dataset.coverId);if(b)loadCover(img,b)}) }
+function bindCards(root=document){ $$('[data-book-id]',root).forEach(el=>el.addEventListener('click',()=>openDetails(el.dataset.bookId))) }
+function skeletons(n=8){return Array.from({length:n},()=>'<div class="card skeleton"></div>').join('')}
+
+async function renderHome(){
+  const view=$('#homeView');
+  view.innerHTML=`<section class="hero"><div class="hero-bg"></div><div class="hero-content"><div class="eyebrow">Featured audiobook</div><h1>AudioBox</h1><div class="hero-author">Loading the library…</div><p class="hero-desc">Stories, classics, mysteries, history and more.</p></div></section><div class="content-rows"><section class="row"><div class="row-head"><h2>Loading</h2></div><div class="rail">${skeletons()}</div></section></div>`;
+  try{
+    const [featured,...rowResults]=await Promise.all([
+      fetchBooks({genre:'Adventure',limit:12}),
+      fetchBooks({genre:'Mystery',limit:16}),
+      fetchBooks({genre:'Adventure',limit:16,offset:16}),
+      fetchBooks({genre:'Science Fiction',limit:16}),
+      fetchBooks({genre:'Horror',limit:16}),
+      fetchBooks({genre:'Romance',limit:16})
+    ]);
+    const hero=bestEditions(featured)[0]||featured[0];
+    const recent=await booksFromIds(Object.keys(store.progress()).sort((a,b)=>(store.progress()[b]?.updatedAt||0)-(store.progress()[a]?.updatedAt||0)).slice(0,14));
+    const recentlyPlayed=await booksFromIds(store.recent().slice(0,14));
+    const fav=await booksFromIds(store.favorites().slice(0,14));
+    const rowDefs=[
+      ...(recent.length?[['Continue Listening',recent]]:[]),
+      ...(recentlyPlayed.length?[['Recently Played',recentlyPlayed]]:[]),
+      ['Mysteries',bestEditions(rowResults[0])],['Adventure',bestEditions(rowResults[1])],['Science Fiction',bestEditions(rowResults[2])],['Dark & Supernatural',bestEditions(rowResults[3])],['Romance',bestEditions(rowResults[4])],
+ 
