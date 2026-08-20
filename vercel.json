@@ -2,11 +2,13 @@
   "version": 2,
   "builds": [
     { "src": "api/catalog.js", "use": "@vercel/node" },
+    { "src": "api/playback.js", "use": "@vercel/node" },
     { "src": "api/librivox.js", "use": "@vercel/node" },
     { "src": "api/openlibrary.js", "use": "@vercel/node" },
     { "src": "api/wikipedia.js", "use": "@vercel/node" },
     { "src": "index.html", "use": "@vercel/static" },
     { "src": "app-v2.js", "use": "@vercel/static" },
+    { "src": "lib/playback-proxy.js", "use": "@vercel/static" },
     { "src": "styles.css", "use": "@vercel/static" },
     { "src": "netflix.css", "use": "@vercel/static" },
     { "src": "sw.js", "use": "@vercel/static" },
@@ -15,6 +17,7 @@
   ],
   "routes": [
     { "src": "/api/catalog", "dest": "/api/catalog.js" },
+    { "src": "/api/playback", "dest": "/api/playback.js" },
     { "src": "/api/librivox", "dest": "/api/librivox.js" },
     { "src": "/api/openlibrary", "dest": "/api/openlibrary.js" },
     { "src": "/api/wikipedia", "dest": "/api/wikipedia.js" },
