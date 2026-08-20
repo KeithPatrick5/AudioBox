@@ -5,13 +5,13 @@ const LIBEX_ORIGINS = [
   'https://libex.lostcartographer.xyz'
 ];
 
-const HOME_SHELVES = [
-  ['Trending Now', { products_sort_by: 'BestSellers', limit: 36 }],
-  ['New & Upcoming', { products_sort_by: '-ReleaseDate', limit: 30 }],
-  ['Fantasy', { keywords: 'fantasy', products_sort_by: 'BestSellers', limit: 24 }],
-  ['Mystery & Thrillers', { keywords: 'mystery thriller', products_sort_by: 'BestSellers', limit: 24 }],
-  ['Science Fiction', { keywords: 'science fiction', products_sort_by: 'BestSellers', limit: 24 }],
-  ['Romance', { keywords: 'romance', products_sort_by: 'BestSellers', limit: 24 }]
+const HOME_GENRES = [
+  ['Fantasy', /fantasy|epic|magic|sword|dragon/i],
+  ['Mystery & Thrillers', /mystery|thriller|crime|detective|suspense/i],
+  ['Science Fiction', /science fiction|sci[- ]?fi|space|dystopia|cyberpunk/i],
+  ['Romance', /romance|love story/i],
+  ['Biography & Memoir', /biography|memoir|autobiography/i],
+  ['Business & Money', /business|money|finance|economics|entrepreneur/i]
 ];
 
 function clean(value, max = 200) {
@@ -23,7 +23,7 @@ function clamp(value, min, max, fallback) {
   return Number.isFinite(n) ? Math.max(min, Math.min(max, n)) : fallback;
 }
 
-async function fetchJson(url, timeoutMs = 14000) {
+async function fetchJson(url, timeoutMs = 6000) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -31,12 +31,12 @@ async function fetchJson(url, timeoutMs = 14000) {
       signal: controller.signal,
       headers: {
         Accept: 'application/json',
-        'User-Agent': 'AudioBox/2.0 (+https://github.com/KeithPatrick5/AudioBox)'
+        'User-Agent': 'AudioBox/2.1 (+https://github.com/KeithPatrick5/AudioBox)'
       }
     });
     if (!response.ok) {
       const text = await response.text().catch(() => '');
-      const err = new Error(`Libex returned ${response.status}${text ? `: ${text.slice(0, 140)}` : ''}`);
+      const err = new Error(`Libex returned ${response.status}${text ? `: ${text.slice(0, 120)}` : ''}`);
       err.status = response.status;
       throw err;
     }
@@ -46,23 +46,26 @@ async function fetchJson(url, timeoutMs = 14000) {
   }
 }
 
+async function firstSuccessful(urls) {
+  const tasks = urls.map(url => fetchJson(url));
+  try {
+    return await Promise.any(tasks);
+  } catch (aggregate) {
+    const errors = aggregate?.errors || [];
+    const notFound = errors.length && errors.every(e => e?.status === 404);
+    const error = errors.find(e => e?.status !== 404) || errors[0] || new Error('Libex is unavailable');
+    if (notFound) error.status = 404;
+    throw error;
+  }
+}
+
 async function libex(path, params = {}) {
   const query = new URLSearchParams();
   query.set('region', 'us');
   for (const [key, value] of Object.entries(params)) {
     if (value !== undefined && value !== null && value !== '') query.set(key, String(value));
   }
-
-  let lastError;
-  for (const origin of LIBEX_ORIGINS) {
-    try {
-      return await fetchJson(`${origin}${path}?${query.toString()}`);
-    } catch (error) {
-      lastError = error;
-      if (error?.status === 404) throw error;
-    }
-  }
-  throw lastError || new Error('Libex is unavailable');
+  return firstSuccessful(LIBEX_ORIGINS.map(origin => `${origin}${path}?${query.toString()}`));
 }
 
 function names(items) {
@@ -125,6 +128,19 @@ function normalizeList(payload) {
   });
 }
 
+function dedupe(books) {
+  const seen = new Set();
+  return (books || []).filter(book => {
+    if (!book?.id || seen.has(book.id)) return false;
+    seen.add(book.id);
+    return true;
+  });
+}
+
+function searchableText(book) {
+  return [book.title, book.subtitle, book.description, ...(book.genres || [])].filter(Boolean).join(' ');
+}
+
 function cache(res, seconds, stale = 86400) {
   res.setHeader('Cache-Control', `public, s-maxage=${seconds}, stale-while-revalidate=${stale}`);
 }
@@ -135,22 +151,31 @@ async function searchBooks(params) {
 }
 
 async function homePayload() {
-  const settled = await Promise.allSettled(
-    HOME_SHELVES.map(([, params]) => searchBooks(params))
-  );
+  const settled = await Promise.allSettled([
+    searchBooks({ products_sort_by: 'BestSellers', limit: 50 }),
+    searchBooks({ products_sort_by: '-ReleaseDate', limit: 50 })
+  ]);
 
-  const rows = settled.map((result, index) => ({
-    name: HOME_SHELVES[index][0],
-    books: result.status === 'fulfilled' ? result.value : []
-  })).filter(row => row.books.length);
+  const trending = settled[0].status === 'fulfilled' ? settled[0].value : [];
+  const newest = settled[1].status === 'fulfilled' ? settled[1].value : [];
+  const pool = dedupe([...trending, ...newest]);
 
-  if (!rows.length) {
+  if (!pool.length) {
     const errors = settled.filter(x => x.status === 'rejected').map(x => x.reason?.message).filter(Boolean);
     throw new Error(errors[0] || 'No catalog rows could be loaded');
   }
 
-  const hero = rows[0]?.books?.[0] || rows.flatMap(row => row.books)[0] || null;
-  return { hero, rows, provider: 'Libex / Audible metadata' };
+  const rows = [];
+  if (trending.length) rows.push({ name: 'Trending Now', books: trending.slice(0, 30) });
+  if (newest.length) rows.push({ name: 'New Releases', books: newest.slice(0, 28) });
+
+  for (const [name, regex] of HOME_GENRES) {
+    const books = pool.filter(book => regex.test(searchableText(book))).slice(0, 22);
+    if (books.length >= 5) rows.push({ name, books });
+  }
+
+  const hero = trending[0] || newest[0] || pool[0] || null;
+  return { hero, rows, provider: 'Libex / Audible metadata', generatedAt: Date.now() };
 }
 
 module.exports = async function handler(req, res) {
@@ -171,7 +196,7 @@ module.exports = async function handler(req, res) {
         limit: clamp(req.query?.limit, 1, 50, 40),
         page: clamp(req.query?.page, 0, 9, 0)
       });
-      cache(res, 900, 86400);
+      cache(res, 1800, 86400);
       return res.status(200).json({ books });
     }
 
@@ -183,26 +208,14 @@ module.exports = async function handler(req, res) {
         limit: clamp(req.query?.limit, 1, 50, 50),
         page: clamp(req.query?.page, 0, 9, 0)
       });
-      cache(res, 3600, 86400);
+      cache(res, 7200, 86400);
       return res.status(200).json({ books });
     }
 
     if (mode === 'book') {
       const asin = clean(req.query?.asin, 20).toUpperCase();
       if (!/^[A-Z0-9]{10}$/.test(asin)) return res.status(400).json({ error: 'Invalid audiobook ID.' });
-      let payload;
-      let lastError;
-      for (const origin of LIBEX_ORIGINS) {
-        try {
-          payload = await fetchJson(`${origin}/book/${encodeURIComponent(asin)}?region=us`);
-          lastError = null;
-          break;
-        } catch (error) {
-          lastError = error;
-          if (error?.status === 404) break;
-        }
-      }
-      if (!payload) throw lastError || new Error('Book metadata unavailable');
+      const payload = await firstSuccessful(LIBEX_ORIGINS.map(origin => `${origin}/book/${encodeURIComponent(asin)}?region=us`));
       const book = normalizeBook(payload);
       cache(res, 86400, 604800);
       return res.status(200).json({ book });
@@ -211,6 +224,9 @@ module.exports = async function handler(req, res) {
     return res.status(400).json({ error: 'Unknown catalog request.' });
   } catch (error) {
     const status = error?.status === 404 ? 404 : 502;
-    res.status(status).json({ error: status === 404 ? 'No audiobooks found.' : 'The audiobook catalog is temporarily unavailable.', detail: error?.message || 'Unknown error' });
+    res.status(status).json({
+      error: status === 404 ? 'No audiobooks found.' : 'The audiobook catalog is temporarily unavailable.',
+      detail: error?.message || 'Unknown error'
+    });
   }
 };
