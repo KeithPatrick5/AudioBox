@@ -8,8 +8,9 @@
   <link rel="manifest" href="manifest.webmanifest" />
   <title>AudioBox</title>
   <link rel="preconnect" href="https://archive.org" crossorigin />
-  <link rel="preconnect" href="https://covers.openlibrary.org" crossorigin />
+  <link rel="preconnect" href="https://m.media-amazon.com" crossorigin />
   <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="netflix.css" />
 </head>
 <body>
   <div id="appShell">
@@ -28,7 +29,7 @@
     <section class="search-panel" id="searchPanel" aria-hidden="true">
       <div class="search-box">
         <span class="i-search"></span>
-        <input id="searchInput" type="search" autocomplete="off" placeholder="Titles or authors" aria-label="Search audiobooks" />
+        <input id="searchInput" type="search" autocomplete="off" placeholder="Titles, authors, series" aria-label="Search audiobooks" />
         <button class="icon-btn" id="searchClose" aria-label="Close search">×</button>
       </div>
       <div class="search-meta" id="searchMeta">Search the AudioBox catalog</div>
@@ -80,8 +81,6 @@
   </aside>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="lib/archive-client.js" defer></script>
-  <script src="app.js" defer></script>
-  <script src="lib/archive-hooks.js" defer></script>
+  <script src="app-v2.js" defer></script>
 </body>
 </html>
