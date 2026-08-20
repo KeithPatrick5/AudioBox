@@ -173,7 +173,6 @@ function setupPlatformFeatures(){
   if('mediaSession' in navigator){
     const handlers={play:()=>$('#audio').play(),pause:()=>$('#audio').pause(),previoustrack:()=>nextChapter(-1),nexttrack:()=>nextChapter(1),seekbackward:d=>{$('#audio').currentTime=Math.max(0,$('#audio').currentTime-(d.seekOffset||15))},seekforward:d=>{$('#audio').currentTime=Math.min($('#audio').duration||Infinity,$('#audio').currentTime+(d.seekOffset||15))}};
     for(const [action,fn] of Object.entries(handlers)){try{navigator.mediaSession.setActionHandler(action,fn)}catch{}}
-
   }
   if('serviceWorker' in navigator && location.protocol!=='file:') navigator.serviceWorker.register('/sw.js').catch(()=>{});
 }
