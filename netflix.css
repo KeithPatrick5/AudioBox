@@ -1,0 +1,43 @@
+/* AudioBox v2 catalog layer — keeps the original Netflix-style shell, adds modern catalog polish. */
+.netflix-hero .hero-bg{
+  background-color:#101010;
+  background-repeat:no-repeat;
+  background-size:min(46vw,620px) auto;
+  background-position:right 48% center;
+  filter:saturate(.92) contrast(1.02);
+}
+.netflix-hero .hero-bg:after{
+  background:
+    radial-gradient(circle at 78% 45%,transparent 0 20%,rgba(7,7,7,.18) 43%,rgba(7,7,7,.82) 74%,#070707 100%),
+    linear-gradient(90deg,#070707 0%,rgba(7,7,7,.97) 34%,rgba(7,7,7,.72) 58%,rgba(7,7,7,.18) 82%),
+    linear-gradient(0deg,#070707 0%,transparent 42%);
+}
+.netflix-hero .hero-content{max-width:720px}
+.netflix-hero h1{font-size:clamp(42px,6vw,78px);max-width:780px}
+.n-mark{display:inline-grid;place-items:center;width:22px;height:22px;margin-right:8px;background:#e50914;color:#fff;font-size:13px;letter-spacing:0;font-weight:900;border-radius:2px}
+.loading-hero{min-height:70vh}
+.catalog-card{background:#121212}
+.catalog-card img{z-index:1}
+.catalog-card .cover-fallback{z-index:0}
+.catalog-card .card-overlay{z-index:3}
+.catalog-chip{position:absolute;z-index:4;top:9px;left:9px;padding:5px 7px;border-radius:4px;background:rgba(0,0,0,.72);backdrop-filter:blur(7px);font-size:9px;font-weight:800;letter-spacing:.06em;opacity:0;transition:opacity .18s}
+.catalog-card:hover .catalog-chip{opacity:1}
+.detail-subtitle{font-size:17px;color:#bdbdbd;margin:-3px 0 12px;max-width:650px}
+.modern-detail .detail-hero-bg{background-size:min(48%,460px) auto;background-repeat:no-repeat;background-position:right 45% center;filter:saturate(.9)}
+.modern-detail.detail-hero:after{background:linear-gradient(90deg,#181818 0%,#181818f4 45%,#1818189a 68%,#18181845),linear-gradient(0deg,#181818,transparent 65%)}
+.playback-zone{padding:0 54px 54px}
+.playback-check,.playback-unavailable{border-top:1px solid #303030;padding:27px 0 0;display:flex;align-items:center;gap:16px;color:#ddd}
+.playback-check span,.playback-unavailable span{display:block;color:#8d8d8d;font-size:13px;line-height:1.5;margin-top:4px}
+.playback-unavailable{display:block}
+.playback-unavailable strong{display:block;font-size:17px;margin-bottom:5px}
+.chapters{padding:0}
+.chapters-head span{font-size:11px;color:#777;text-align:right}
+.btn:disabled{opacity:.55;cursor:default}
+.card img[referrerpolicy]{background:#161616}
+@media(max-width:820px){
+  .netflix-hero .hero-bg{background-size:80vw auto;background-position:center 24%}
+  .netflix-hero .hero-bg:after{background:linear-gradient(0deg,#070707 0%,rgba(7,7,7,.2) 64%,rgba(7,7,7,.28)),linear-gradient(90deg,#070707aa,transparent,#07070777)}
+  .modern-detail .detail-hero-bg{background-size:72vw auto;background-position:center 20%}
+  .playback-zone{padding:0 24px 38px}
+  .catalog-chip{opacity:1;font-size:8px}
+}
