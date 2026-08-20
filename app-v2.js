@@ -21,7 +21,8 @@
     books: new Map(),
     playback: new Map(),
     playbackPromises: new Map(),
-    currentBook: null,
+    detailBook: null,
+    playingBook: null,
     currentPlayback: null,
     currentChapter: 0,
     currentView: 'home',
@@ -305,7 +306,7 @@
     try {
       const book = await getBook(id);
       if (!book) throw new Error('Book metadata unavailable.');
-      state.currentBook = book;
+      state.detailBook = book;
       content.innerHTML = detailMarkup(book);
       $('[data-favorite]', content)?.addEventListener('click', event => {
         const added = storage.toggleFavorite(book.id);
@@ -316,7 +317,7 @@
       $('[data-detail-play]', content)?.addEventListener('click', () => playBook(book.id));
 
       const playback = await resolvePlayback(book);
-      if (state.currentBook?.id !== book.id) return;
+      if (state.detailBook?.id !== book.id) return;
       renderPlaybackZone(book, playback);
     } catch (error) {
       content.innerHTML = errorBox('Could not open this audiobook', error.message);
@@ -494,7 +495,7 @@
     const audio = $('#audio');
     const section = playback.sections[chapterIndex];
     if (!section) return;
-    state.currentBook = book;
+    state.playingBook = book;
     state.currentPlayback = playback;
     state.currentChapter = chapterIndex;
     storage.rememberBook(book);
@@ -542,12 +543,12 @@
   }
 
   function fullPlaybackDuration() {
-    return state.currentPlayback?.sections?.reduce((sum, s) => sum + Number(s.duration || 0), 0) || (state.currentBook?.durationMinutes || 0) * 60;
+    return state.currentPlayback?.sections?.reduce((sum, s) => sum + Number(s.duration || 0), 0) || (state.playingBook?.durationMinutes || 0) * 60;
   }
 
   function saveProgress(force = false) {
     const audio = $('#audio');
-    const book = state.currentBook;
+    const book = state.playingBook;
     if (!book || !state.currentPlayback?.sections?.length) return;
     const now = Date.now();
     if (!force && now - state.lastProgressSave < 5000) return;
@@ -561,11 +562,11 @@
   }
 
   function nextChapter(delta = 1) {
-    if (!state.currentPlayback || !state.currentBook) return;
+    if (!state.currentPlayback || !state.playingBook) return;
     const next = state.currentChapter + delta;
     if (next < 0 || next >= state.currentPlayback.sections.length) return;
     saveProgress(true);
-    startPlayback(state.currentBook, state.currentPlayback, next, false);
+    startPlayback(state.playingBook, state.currentPlayback, next, false);
   }
 
   function toast(message) {
@@ -644,7 +645,7 @@
     play.addEventListener('click', () => audio.paused ? audio.play().catch(() => {}) : audio.pause());
     $('#prevChapter').addEventListener('click', () => nextChapter(-1));
     $('#nextChapter').addEventListener('click', () => nextChapter(1));
-    $('#playerExpand').addEventListener('click', () => state.currentBook && openDetails(state.currentBook.id));
+    $('#playerExpand').addEventListener('click', () => state.playingBook && openDetails(state.playingBook.id));
 
     audio.addEventListener('play', () => { play.textContent = '❚❚'; });
     audio.addEventListener('pause', () => { play.textContent = '▶'; saveProgress(true); });
