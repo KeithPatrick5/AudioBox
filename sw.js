@@ -1,5 +1,5 @@
-const CACHE='audiobox-shell-v2';
-const SHELL=['/','/index.html','/styles.css','/netflix.css','/app-v2.js','/manifest.webmanifest','/assets/logo.svg'];
+const CACHE='audiobox-shell-v3';
+const SHELL=['/','/index.html','/styles.css','/netflix.css','/lib/playback-proxy.js','/app-v2.js','/manifest.webmanifest','/assets/logo.svg'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',event=>{
