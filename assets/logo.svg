@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 620 150" role="img" aria-label="AudioBox">
+  <rect width="620" height="150" rx="28" fill="#0a0a0a"/>
+  <g transform="translate(25 24)">
+    <rect x="0" y="0" width="102" height="102" rx="22" fill="#e50914"/>
+    <path d="M27 70V33h12l24 28V33h13v37H64L40 42v28H27Z" fill="white" opacity=".96"/>
+    <path d="M82 28v47" stroke="white" stroke-width="4" stroke-linecap="round" opacity=".35"/>
+  </g>
+  <text x="150" y="96" fill="white" font-size="70" font-family="Arial,Helvetica,sans-serif" font-weight="800" letter-spacing="-3">AudioBox</text>
+</svg>
